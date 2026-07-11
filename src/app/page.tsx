@@ -1,65 +1,124 @@
-import Image from "next/image";
+"use client";
+
+import React, { useState, useEffect, Suspense } from "react";
+import EnvelopeLanding from "@/components/EnvelopeLanding";
+import BackgroundParticles from "@/components/BackgroundParticles";
+import AudioPlayer from "@/components/AudioPlayer";
+import InvitationCard from "@/components/InvitationCard";
+import DetailsSection from "@/components/DetailsSection";
+import LocationSection from "@/components/LocationSection";
+import GallerySection from "@/components/GallerySection";
+import WishesSection from "@/components/WishesSection";
+import Footer from "@/components/Footer";
 
 export default function Home() {
+  const [isOpened, setIsOpened] = useState(false);
+  const [playAudio, setPlayAudio] = useState(false);
+  const [guestName, setGuestName] = useState("");
+
+  // Extract guest name query param client-side (safe from hydration mismatches)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const to = params.get("to") || params.get("guest") || params.get("name") || "";
+      setGuestName(to);
+    }
+  }, []);
+
+  // Control scrolling and initialize Lenis when envelope opens
+  useEffect(() => {
+    if (!isOpened) {
+      document.body.style.overflow = "hidden";
+      window.scrollTo(0, 0);
+    } else {
+      document.body.style.overflow = "unset";
+
+      // Dynamically load Lenis for smooth scroll performance
+      let lenisDestroy: () => void = () => {};
+      
+      import("lenis").then(({ default: Lenis }) => {
+        const lenis = new Lenis({
+          duration: 1.2,
+          easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // smooth easeOutExpo
+          wheelMultiplier: 1.0,
+          touchMultiplier: 1.5,
+        });
+
+        function raf(time: number) {
+          lenis.raf(time);
+          requestAnimationFrame(raf);
+        }
+        requestAnimationFrame(raf);
+
+        lenisDestroy = () => lenis.destroy();
+      });
+
+      return () => {
+        lenisDestroy();
+      };
+    }
+  }, [isOpened]);
+
+  const handleOpenEnvelope = () => {
+    setIsOpened(true);
+    setPlayAudio(true);
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="relative min-h-screen w-full overflow-hidden select-none">
+      {/* 1. Envelope Landing Cover Screen */}
+      <EnvelopeLanding onOpen={handleOpenEnvelope} guestName={guestName} />
+
+      {/* 2. Main Page Content (Revealed after envelope opens) */}
+      {isOpened && (
+        <div className="relative w-full z-20 flex flex-col bg-[#FDFBF8] satin-bg">
+          {/* Animated Coquette Background Ornaments & Sparkles */}
+          <BackgroundParticles />
+
+          {/* Floating Audio Player control */}
+          <AudioPlayer playSignal={playAudio} />
+
+          {/* Scroll progress line indicator */}
+          <ScrollProgressBar />
+
+          {/* Core App sections */}
+          <main className="w-full flex-grow relative z-30">
+            <InvitationCard guestName={guestName} />
+            <DetailsSection />
+            <LocationSection />
+            <GallerySection />
+            <WishesSection />
+          </main>
+
+          <Footer />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      )}
     </div>
   );
 }
+
+// Simple internal Scroll Progress Indicator component
+function ScrollProgressBar() {
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const totalScroll = document.documentElement.scrollHeight - window.innerHeight;
+      if (totalScroll > 0) {
+        setScrollProgress((window.scrollY / totalScroll) * 100);
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  return (
+    <div className="fixed top-0 left-0 right-0 h-1 bg-pink-soft/20 z-50">
+      <div
+        className="h-full bg-gradient-to-r from-pink-soft via-gold to-pink-dark transition-all duration-100 ease-out"
+        style={{ width: `${scrollProgress}%` }}
+      />
+    </div>
+  );
+}
+
